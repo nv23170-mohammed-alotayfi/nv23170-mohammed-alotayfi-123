@@ -30,7 +30,18 @@ const db = new sqlite3.Database('./todo.db', (err) => {
 
 // Routes
 app.get('/tasks', (req, res) => {
-  db.all('SELECT * FROM tasks ORDER BY created_at DESC', [], (err, rows) => {
+  const { q } = req.query;
+  let query = 'SELECT * FROM tasks';
+  let params = [];
+
+  if (q) {
+    query += ' WHERE title LIKE ? OR description LIKE ?';
+    params = [`%${q}%`, `%${q}%`];
+  }
+
+  query += ' ORDER BY created_at DESC';
+
+  db.all(query, params, (err, rows) => {
     if (err) {
       res.status(500).json({ error: err.message });
       return;
