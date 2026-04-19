@@ -1,0 +1,87 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ToDo SaaS</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .task { border: 1px solid #ccc; padding: 10px; margin: 10px 0; }
+        .completed { background-color: #e0ffe0; }
+        form { margin-bottom: 20px; }
+        input, select, textarea { display: block; margin: 5px 0; width: 300px; }
+        button { margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <h1>ToDo SaaS</h1>
+    <form id="taskForm">
+        <input type="text" id="title" placeholder="Task Title" required>
+        <textarea id="description" placeholder="Description"></textarea>
+        <select id="priority">
+            <option value="low">Low</option>
+            <option value="medium" selected>Medium</option>
+            <option value="high">High</option>
+        </select>
+        <input type="date" id="due_date">
+        <button type="submit">Add Task</button>
+    </form>
+    <div id="tasks"></div>
+
+    <script>
+        const API_URL = 'http://localhost:3000/tasks';
+
+        async function loadTasks() {
+            const response = await fetch(API_URL);
+            const tasks = await response.json();
+            const tasksDiv = document.getElementById('tasks');
+            tasksDiv.innerHTML = '';
+            tasks.forEach(task => {
+                const taskDiv = document.createElement('div');
+                taskDiv.className = `task ${task.status === 'completed' ? 'completed' : ''}`;
+                taskDiv.innerHTML = `
+                    <h3>${task.title}</h3>
+                    <p>${task.description || ''}</p>
+                    <p>Priority: ${task.priority} | Due: ${task.due_date || 'N/A'} | Status: ${task.status}</p>
+                    <button onclick="toggleStatus(${task.id}, '${task.status}')">${task.status === 'pending' ? 'Complete' : 'Mark Pending'}</button>
+                    <button onclick="deleteTask(${task.id})">Delete</button>
+                `;
+                tasksDiv.appendChild(taskDiv);
+            });
+        }
+
+        document.getElementById('taskForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const title = document.getElementById('title').value;
+            const description = document.getElementById('description').value;
+            const priority = document.getElementById('priority').value;
+            const due_date = document.getElementById('due_date').value;
+
+            await fetch(API_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ title, description, priority, due_date })
+            });
+            document.getElementById('taskForm').reset();
+            loadTasks();
+        });
+
+        async function toggleStatus(id, currentStatus) {
+            const newStatus = currentStatus === 'pending' ? 'completed' : 'pending';
+            await fetch(`${API_URL}/${id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ status: newStatus })
+            });
+            loadTasks();
+        }
+
+        async function deleteTask(id) {
+            await fetch(`${API_URL}/${id}`, { method: 'DELETE' });
+            loadTasks();
+        }
+
+        loadTasks();
+    </script>
+</body>
+</html>

@@ -41,8 +41,23 @@ app.get('/tasks', (req, res) => {
 
 app.post('/tasks', (req, res) => {
   const { title, description, status, priority, due_date } = req.body;
+
+  // Validation
+  if (!title || title.trim() === '') {
+    return res.status(400).json({ error: 'Title is required' });
+  }
+  if (status && !['pending', 'completed'].includes(status)) {
+    return res.status(400).json({ error: 'Status must be pending or completed' });
+  }
+  if (priority && !['low', 'medium', 'high'].includes(priority)) {
+    return res.status(400).json({ error: 'Priority must be low, medium, or high' });
+  }
+  if (due_date && isNaN(Date.parse(due_date))) {
+    return res.status(400).json({ error: 'Due date must be a valid date' });
+  }
+
   db.run(`INSERT INTO tasks (title, description, status, priority, due_date) VALUES (?, ?, ?, ?, ?)`,
-    [title, description || '', status || 'pending', priority || 'medium', due_date],
+    [title.trim(), description || '', status || 'pending', priority || 'medium', due_date],
     function(err) {
       if (err) {
         res.status(500).json({ error: err.message });
@@ -55,8 +70,23 @@ app.post('/tasks', (req, res) => {
 app.put('/tasks/:id', (req, res) => {
   const { id } = req.params;
   const { title, description, status, priority, due_date } = req.body;
-  db.run(`UPDATE tasks SET title = ?, description = ?, status = ?, priority = ?, due_date = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
-    [title, description, status, priority, due_date, id],
+
+  // Validation
+  if (title !== undefined && (title.trim() === '')) {
+    return res.status(400).json({ error: 'Title cannot be empty' });
+  }
+  if (status && !['pending', 'completed'].includes(status)) {
+    return res.status(400).json({ error: 'Status must be pending or completed' });
+  }
+  if (priority && !['low', 'medium', 'high'].includes(priority)) {
+    return res.status(400).json({ error: 'Priority must be low, medium, or high' });
+  }
+  if (due_date && isNaN(Date.parse(due_date))) {
+    return res.status(400).json({ error: 'Due date must be a valid date' });
+  }
+
+  db.run(`UPDATE tasks SET title = COALESCE(?, title), description = COALESCE(?, description), status = COALESCE(?, status), priority = COALESCE(?, priority), due_date = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+    [title ? title.trim() : null, description, status, priority, due_date, id],
     function(err) {
       if (err) {
         res.status(500).json({ error: err.message });
