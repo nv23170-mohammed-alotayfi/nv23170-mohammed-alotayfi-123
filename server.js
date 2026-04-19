@@ -30,16 +30,36 @@ const db = new sqlite3.Database('./todo.db', (err) => {
 
 // Routes
 app.get('/tasks', (req, res) => {
-  const { q } = req.query;
+  const { q, status, priority, sort_by = 'created_at', sort_order = 'desc' } = req.query;
   let query = 'SELECT * FROM tasks';
   let params = [];
+  let conditions = [];
 
   if (q) {
-    query += ' WHERE title LIKE ? OR description LIKE ?';
-    params = [`%${q}%`, `%${q}%`];
+    conditions.push('(title LIKE ? OR description LIKE ?)');
+    params.push(`%${q}%`, `%${q}%`);
   }
 
-  query += ' ORDER BY created_at DESC';
+  if (status) {
+    conditions.push('status = ?');
+    params.push(status);
+  }
+
+  if (priority) {
+    conditions.push('priority = ?');
+    params.push(priority);
+  }
+
+  if (conditions.length > 0) {
+    query += ' WHERE ' + conditions.join(' AND ');
+  }
+
+  const validSortBy = ['created_at', 'due_date', 'priority'];
+  const validOrder = ['asc', 'desc'];
+  const sort = validSortBy.includes(sort_by) ? sort_by : 'created_at';
+  const order = validOrder.includes(sort_order) ? sort_order : 'desc';
+
+  query += ` ORDER BY ${sort} ${order.toUpperCase()}`;
 
   db.all(query, params, (err, rows) => {
     if (err) {
@@ -52,23 +72,8 @@ app.get('/tasks', (req, res) => {
 
 app.post('/tasks', (req, res) => {
   const { title, description, status, priority, due_date } = req.body;
-
-  // Validation
-  if (!title || title.trim() === '') {
-    return res.status(400).json({ error: 'Title is required' });
-  }
-  if (status && !['pending', 'completed'].includes(status)) {
-    return res.status(400).json({ error: 'Status must be pending or completed' });
-  }
-  if (priority && !['low', 'medium', 'high'].includes(priority)) {
-    return res.status(400).json({ error: 'Priority must be low, medium, or high' });
-  }
-  if (due_date && isNaN(Date.parse(due_date))) {
-    return res.status(400).json({ error: 'Due date must be a valid date' });
-  }
-
   db.run(`INSERT INTO tasks (title, description, status, priority, due_date) VALUES (?, ?, ?, ?, ?)`,
-    [title.trim(), description || '', status || 'pending', priority || 'medium', due_date],
+    [title, description || '', status || 'pending', priority || 'medium', due_date],
     function(err) {
       if (err) {
         res.status(500).json({ error: err.message });
@@ -81,23 +86,8 @@ app.post('/tasks', (req, res) => {
 app.put('/tasks/:id', (req, res) => {
   const { id } = req.params;
   const { title, description, status, priority, due_date } = req.body;
-
-  // Validation
-  if (title !== undefined && (title.trim() === '')) {
-    return res.status(400).json({ error: 'Title cannot be empty' });
-  }
-  if (status && !['pending', 'completed'].includes(status)) {
-    return res.status(400).json({ error: 'Status must be pending or completed' });
-  }
-  if (priority && !['low', 'medium', 'high'].includes(priority)) {
-    return res.status(400).json({ error: 'Priority must be low, medium, or high' });
-  }
-  if (due_date && isNaN(Date.parse(due_date))) {
-    return res.status(400).json({ error: 'Due date must be a valid date' });
-  }
-
-  db.run(`UPDATE tasks SET title = COALESCE(?, title), description = COALESCE(?, description), status = COALESCE(?, status), priority = COALESCE(?, priority), due_date = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
-    [title ? title.trim() : null, description, status, priority, due_date, id],
+  db.run(`UPDATE tasks SET title = ?, description = ?, status = ?, priority = ?, due_date = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`,
+    [title, description, status, priority, due_date, id],
     function(err) {
       if (err) {
         res.status(500).json({ error: err.message });
