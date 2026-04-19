@@ -30,7 +30,38 @@ const db = new sqlite3.Database('./todo.db', (err) => {
 
 // Routes
 app.get('/tasks', (req, res) => {
-  db.all('SELECT * FROM tasks ORDER BY created_at DESC', [], (err, rows) => {
+  const { q, status, priority, sort_by = 'created_at', sort_order = 'desc' } = req.query;
+  let query = 'SELECT * FROM tasks';
+  let params = [];
+  let conditions = [];
+
+  if (q) {
+    conditions.push('(title LIKE ? OR description LIKE ?)');
+    params.push(`%${q}%`, `%${q}%`);
+  }
+
+  if (status) {
+    conditions.push('status = ?');
+    params.push(status);
+  }
+
+  if (priority) {
+    conditions.push('priority = ?');
+    params.push(priority);
+  }
+
+  if (conditions.length > 0) {
+    query += ' WHERE ' + conditions.join(' AND ');
+  }
+
+  const validSortBy = ['created_at', 'due_date', 'priority'];
+  const validOrder = ['asc', 'desc'];
+  const sort = validSortBy.includes(sort_by) ? sort_by : 'created_at';
+  const order = validOrder.includes(sort_order) ? sort_order : 'desc';
+
+  query += ` ORDER BY ${sort} ${order.toUpperCase()}`;
+
+  db.all(query, params, (err, rows) => {
     if (err) {
       res.status(500).json({ error: err.message });
       return;

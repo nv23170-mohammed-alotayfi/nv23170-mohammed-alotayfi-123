@@ -1,0 +1,156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ToDo SaaS</title>
+    <style>
+        body { font-family: Arial, sans-serif; margin: 20px; }
+        .task { border: 1px solid #ccc; padding: 10px; margin: 10px 0; }
+        .completed { background-color: #e0ffe0; }
+        form { margin-bottom: 20px; }
+        input, select, textarea { display: block; margin: 5px 0; width: 300px; }
+        button { margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <h1>ToDo SaaS</h1>
+    <input type="text" id="search" placeholder="Search tasks...">
+    <div id="filters">
+        <select id="statusFilter">
+            <option value="">All Status</option>
+            <option value="pending">Pending</option>
+            <option value="completed">Completed</option>
+        </select>
+        <select id="priorityFilter">
+            <option value="">All Priority</option>
+            <option value="low">Low</option>
+            <option value="medium">Medium</option>
+            <option value="high">High</option>
+        </select>
+        <select id="sortBy">
+            <option value="created_at">Created Date</option>
+            <option value="due_date">Due Date</option>
+            <option value="priority">Priority</option>
+        </select>
+        <select id="sortOrder">
+            <option value="desc">Descending</option>
+            <option value="asc">Ascending</option>
+        </select>
+    </div>
+    <form id="taskForm">
+        <input type="text" id="title" placeholder="Task Title" required>
+        <textarea id="description" placeholder="Description"></textarea>
+        <select id="priority">
+            <option value="low">Low</option>
+            <option value="medium" selected>Medium</option>
+            <option value="high">High</option>
+        </select>
+        <input type="date" id="due_date">
+        <button type="submit">Add Task</button>
+    </form>
+    <div id="tasks"></div>
+
+    <script>
+        const API_URL = 'http://localhost:3000/tasks';
+
+        function getCurrentFilters() {
+            return {
+                search: document.getElementById('search').value,
+                status: document.getElementById('statusFilter').value,
+                priority: document.getElementById('priorityFilter').value,
+                sortBy: document.getElementById('sortBy').value,
+                sortOrder: document.getElementById('sortOrder').value
+            };
+        }
+
+        async function loadTasks(search = '', status = '', priority = '', sortBy = 'created_at', sortOrder = 'desc') {
+            const params = new URLSearchParams();
+            if (search) params.append('q', search);
+            if (status) params.append('status', status);
+            if (priority) params.append('priority', priority);
+            params.append('sort_by', sortBy);
+            params.append('sort_order', sortOrder);
+            const url = `${API_URL}?${params.toString()}`;
+            const response = await fetch(url);
+            const tasks = await response.json();
+            const tasksDiv = document.getElementById('tasks');
+            tasksDiv.innerHTML = '';
+            tasks.forEach(task => {
+                const taskDiv = document.createElement('div');
+                taskDiv.className = `task ${task.status === 'completed' ? 'completed' : ''}`;
+                taskDiv.innerHTML = `
+                    <h3>${task.title}</h3>
+                    <p>${task.description || ''}</p>
+                    <p>Priority: ${task.priority} | Due: ${task.due_date || 'N/A'} | Status: ${task.status}</p>
+                    <button onclick="toggleStatus(${task.id}, '${task.status}')">${task.status === 'pending' ? 'Complete' : 'Mark Pending'}</button>
+                    <button onclick="deleteTask(${task.id})">Delete</button>
+                `;
+                tasksDiv.appendChild(taskDiv);
+            });
+        }
+
+        document.getElementById('taskForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const title = document.getElementById('title').value;
+            const description = document.getElementById('description').value;
+            const priority = document.getElementById('priority').value;
+            const due_date = document.getElementById('due_date').value;
+
+            await fetch(API_URL, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ title, description, priority, due_date })
+            });
+            document.getElementById('taskForm').reset();
+            const f = getCurrentFilters();
+            loadTasks(f.search, f.status, f.priority, f.sortBy, f.sortOrder);
+        });
+
+        async function toggleStatus(id, currentStatus) {
+            const newStatus = currentStatus === 'pending' ? 'completed' : 'pending';
+            await fetch(`${API_URL}/${id}`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ status: newStatus })
+            });
+            const f = getCurrentFilters();
+            loadTasks(f.search, f.status, f.priority, f.sortBy, f.sortOrder);
+        }
+
+        async function deleteTask(id) {
+            await fetch(`${API_URL}/${id}`, { method: 'DELETE' });
+            const f = getCurrentFilters();
+            loadTasks(f.search, f.status, f.priority, f.sortBy, f.sortOrder);
+        }
+
+        document.getElementById('search').addEventListener('input', (e) => {
+            const f = getCurrentFilters();
+            f.search = e.target.value;
+            loadTasks(f.search, f.status, f.priority, f.sortBy, f.sortOrder);
+        });
+
+        document.getElementById('statusFilter').addEventListener('change', () => {
+            const f = getCurrentFilters();
+            loadTasks(f.search, f.status, f.priority, f.sortBy, f.sortOrder);
+        });
+
+        document.getElementById('priorityFilter').addEventListener('change', () => {
+            const f = getCurrentFilters();
+            loadTasks(f.search, f.priority, f.sortBy, f.sortOrder);
+        });
+
+        document.getElementById('sortBy').addEventListener('change', () => {
+            const f = getCurrentFilters();
+            loadTasks(f.search, f.status, f.priority, f.sortBy, f.sortOrder);
+        });
+
+        document.getElementById('sortOrder').addEventListener('change', () => {
+            const f = getCurrentFilters();
+            loadTasks(f.search, f.status, f.priority, f.sortBy, f.sortOrder);
+        });
+
+        loadTasks();
+    </script>
+</body>
+</html>
